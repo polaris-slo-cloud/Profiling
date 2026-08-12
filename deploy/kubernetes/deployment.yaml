@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: polaris-profiler
+spec:
+  # The feedback loop's state (reference dataset, violation counters) lives
+  # in process memory and mutates on every observation. Keep ONE replica per
+  # profile store; externalize the state before scaling horizontally.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: polaris-profiler
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: polaris-profiler
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8080"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: profiler
+          # tag is set centrally by the `images:` block in kustomization.yaml
+          image: polaris-profiler
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: polaris-profiler
+          # gates liveness/readiness until the process is serving at all,
+          # so a slow container start never triggers a kill-reload loop
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+            # artifacts load in the background with retries; readiness turns
+            # 200 once the models + 100k-row reference CSV are in memory
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: models
+              mountPath: /models
+              readOnly: true
+            - name: data
+              mountPath: /data
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: polaris-profiler-models
+        - name: data
+          persistentVolumeClaim:
+            claimName: polaris-profiler-data
+        - name: tmp
+          emptyDir: {}

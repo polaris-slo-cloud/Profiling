@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "polaris-profiler"
+version = "0.1.0"
+description = "ML workload profiling on GPU cluster traces (PolarisProfiler)"
+readme = "README.md"
+requires-python = ">=3.10"
+# scikit-learn, scipy, and numpy are pinned for compatibility with the
+# persisted research artifacts: the OneHotEncoder was pickled with
+# scikit-learn 1.1.2 (its output dimension is baked into the trained XGBoost
+# model, so it cannot be regenerated in isolation).
+dependencies = [
+    "numpy>=1.23,<2",
+    "pandas>=1.5",
+    "scipy>=1.8,<1.11",
+    "scikit-learn>=1.1.3,<1.2",
+    "xgboost",
+    "hdbscan",
+    "joblib",
+    "matplotlib",
+    "seaborn",
+    "statsmodels",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+service = ["fastapi", "uvicorn[standard]", "prometheus-client"]
+dev = ["pytest", "httpx", "jupyter"]
+
+[project.scripts]
+polaris-feedback-loop = "polaris_profiler.cli:run_feedback_loop"
+polaris-plot-features = "polaris_profiler.cli:plot_feature_distributions"
+
+[tool.setuptools.packages.find]
+include = ["polaris_profiler*"]

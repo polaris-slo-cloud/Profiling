@@ -1,0 +1,10 @@
+# Allowlist: only what the image build needs enters the context.
+# (The repo carries ~300MB of data/figures/notebooks — keep them out.)
+*
+!polaris_profiler/
+!tests/
+!pyproject.toml
+!README.md
+# no data, models, results, figures, notebooks, or legacy folder
+polaris_profiler/__pycache__/
+tests/__pycache__/
