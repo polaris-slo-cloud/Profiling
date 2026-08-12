@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: polaris-profiler
+data:
+  # per-profile resource estimator: mean | median | q05 | iqr | skew-adaptive
+  POLARIS_ESTIMATOR: "q05"

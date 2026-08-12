@@ -1,0 +1,64 @@
+# PolarisProfiler services.
+#
+# Host locations of data/models default to the legacy layout; after running
+# scripts/migrate_layout.sh, point them at the new folders via .env
+# (copy .env.example to .env and edit).
+#
+#   docker compose up -d api                         # HTTP service on :8080
+#   docker compose run --rm profiler                 # batch feedback loop
+#   docker compose run --rm profiler --estimator median
+#   docker compose run --rm plots                    # skewness + RMSE figures
+#   docker compose up notebook                       # JupyterLab on :8888
+
+x-artifact-mounts: &artifact-mounts
+  volumes:
+    - ${POLARIS_HOST_DATA:-./ml_data-profiling/experiments}:/data:ro
+    - ${POLARIS_HOST_MODELS:-./ml_data-profiling/experiments}:/models:ro
+    - ${POLARIS_HOST_RESULTS:-./results}:/results
+    - ${POLARIS_HOST_FIGURES:-./figures}:/figures
+
+services:
+  api:
+    build:
+      context: .
+      target: service
+    image: polaris-profiler
+    ports:
+      - "8080:8080"
+    environment:
+      POLARIS_ESTIMATOR: ${POLARIS_ESTIMATOR:-q05}
+    volumes:
+      - ${POLARIS_HOST_DATA:-./ml_data-profiling/experiments}:/data:ro
+      - ${POLARIS_HOST_MODELS:-./ml_data-profiling/experiments}:/models:ro
+
+  profiler:
+    build:
+      context: .
+      target: runtime
+    image: polaris-profiler-cli
+    # image CMD is --help; run the loop by default when invoked bare
+    command: ["--estimator", "q05"]
+    <<: *artifact-mounts
+
+  plots:
+    image: polaris-profiler-cli
+    build:
+      context: .
+      target: runtime
+    entrypoint: ["polaris-plot-features"]
+    command: []
+    <<: *artifact-mounts
+
+  notebook:
+    build:
+      context: .
+      target: notebook
+    image: polaris-profiler-notebook
+    ports:
+      - "8888:8888"
+    volumes:
+      - ${POLARIS_HOST_DATA:-./ml_data-profiling/experiments}:/data:ro
+      - ${POLARIS_HOST_MODELS:-./ml_data-profiling/experiments}:/models:ro
+      - ${POLARIS_HOST_RESULTS:-./results}:/results
+      - ${POLARIS_HOST_FIGURES:-./figures}:/figures
+      - ./notebooks:/home/polaris/notebooks
